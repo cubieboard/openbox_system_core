@@ -11,6 +11,7 @@ LOCAL_SRC_FILES:= \
 	util.c \
 	parser.c \
 	logo.c \
+	init_disp.c \
 	keychords.c \
 	signal_handler.c \
 	init_parser.c \
@@ -27,7 +28,7 @@ LOCAL_MODULE:= init
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT)
 LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)
-
+LOCAL_C_INCLUDES += $(TARGET_HARDWARE_INCLUDE)
 LOCAL_STATIC_LIBRARIES := libcutils libc
 
 include $(BUILD_EXECUTABLE)

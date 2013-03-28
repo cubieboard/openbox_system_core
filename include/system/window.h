@@ -21,7 +21,7 @@
 #include <sys/cdefs.h>
 #include <system/graphics.h>
 #include <cutils/native_handle.h>
-
+//#include <hardware/hwcomposer.h>
 __BEGIN_DECLS
 
 /*****************************************************************************/
@@ -213,6 +213,34 @@ enum {
     NATIVE_WINDOW_TRANSFORM_HINT = 8,
 };
 
+#if 0
+enum
+{
+    NATIVE_WINDOW_CMD_SETFRAMEPARA          = HWC_LAYER_SETFRAMEPARA,
+    NATIVE_WINDOW_CMD_SETVIDEOPARA          = HWC_LAYER_SETVIDEOPARA,
+    NATIVE_WINDOW_CMD_GETCURFRAMEPARA       = HWC_LAYER_GETCURFRAMEPARA,
+    NATIVE_WINDOW_CMD_SETSCREEN             = HWC_LAYER_SETSCREEN,
+    NATIVE_WINDOW_CMD_SHOW                  = HWC_LAYER_SHOW,
+    NATIVE_WINDOW_CMD_SET3DMODE             = HWC_LAYER_SET3DMODE,    
+    NATIVE_WINDOW_CMD_SETFORMAT             = HWC_LAYER_SETFORMAT,    
+    NATIVE_WINDOW_CMD_VPPON                 = HWC_LAYER_VPPON,    
+    NATIVE_WINDOW_CMD_VPPGETON              = HWC_LAYER_VPPGETON,    
+    NATIVE_WINDOW_CMD_SETLUMASHARP          = HWC_LAYER_SETLUMASHARP,    
+    NATIVE_WINDOW_CMD_GETLUMASHARP          = HWC_LAYER_GETLUMASHARP,    
+    NATIVE_WINDOW_CMD_SETCHROMASHARP        = HWC_LAYER_SETCHROMASHARP,    
+    NATIVE_WINDOW_CMD_GETCHROMASHARP        = HWC_LAYER_GETCHROMASHARP,    
+    NATIVE_WINDOW_CMD_SETWHITEEXTEN         = HWC_LAYER_SETWHITEEXTEN,    
+    NATIVE_WINDOW_CMD_GETWHITEEXTEN         = HWC_LAYER_GETWHITEEXTEN,    
+    NATIVE_WINDOW_CMD_SETBLACKEXTEN         = HWC_LAYER_SETBLACKEXTEN,    
+    NATIVE_WINDOW_CMD_GETBLACKEXTEN         = HWC_LAYER_GETBLACKEXTEN
+};
+#endif
+
+enum
+{
+	NATIVE_WINDOW_CMD_GET_SURFACE_TEXTURE_TYPE = 0,
+};
+
 /* valid operations for the (*perform)() hook */
 enum {
     NATIVE_WINDOW_SET_USAGE                 =  0,
@@ -230,6 +258,8 @@ enum {
     NATIVE_WINDOW_UNLOCK_AND_POST           = 12,   /* private */
     NATIVE_WINDOW_API_CONNECT               = 13,   /* private */
     NATIVE_WINDOW_API_DISCONNECT            = 14,   /* private */
+    NATIVE_WINDOW_SETPARAMETER              = 50,
+    NATIVE_WINDOW_GETPARAMETER              = 51
 };
 
 /* parameter for NATIVE_WINDOW_[API_][DIS]CONNECT */
@@ -251,6 +281,10 @@ enum {
     /* Buffers will be queued by the the camera HAL.
      */
     NATIVE_WINDOW_API_CAMERA = 4,
+
+    NATIVE_WINDOW_API_MEDIA_HW = 5,
+
+    NATIVE_WINDOW_API_CAMERA_HW = 6,
 };
 
 /* parameter for NATIVE_WINDOW_SET_BUFFERS_TRANSFORM */
@@ -340,9 +374,15 @@ struct ANativeWindow
                 int interval);
 
     /*
-     * hook called by EGL to acquire a buffer. After this call, the buffer
-     * is not locked, so its content cannot be modified.
-     * this call may block if no buffers are available.
+     * Hook called by EGL to acquire a buffer. After this call, the buffer
+     * is not locked, so its content cannot be modified. This call may block if
+     * no buffers are available.
+     *
+     * The window holds a reference to the buffer between dequeueBuffer and
+     * either queueBuffer or cancelBuffer, so clients only need their own
+     * reference if they might use the buffer after queueing or canceling it.
+     * Holding a reference to a buffer after queueing or canceling it is only
+     * allowed if a specific buffer count has been set.
      *
      * Returns 0 on success or -errno on error.
      */
@@ -358,14 +398,20 @@ struct ANativeWindow
      */
     int     (*lockBuffer)(struct ANativeWindow* window,
                 struct ANativeWindowBuffer* buffer);
-   /*
-    * hook called by EGL when modifications to the render buffer are done.
-    * This unlocks and post the buffer.
-    *
-    * Buffers MUST be queued in the same order than they were dequeued.
-    *
-    * Returns 0 on success or -errno on error.
-    */
+    /*
+     * Hook called by EGL when modifications to the render buffer are done.
+     * This unlocks and post the buffer.
+     *
+     * The window holds a reference to the buffer between dequeueBuffer and
+     * either queueBuffer or cancelBuffer, so clients only need their own
+     * reference if they might use the buffer after queueing or canceling it.
+     * Holding a reference to a buffer after queueing or canceling it is only
+     * allowed if a specific buffer count has been set.
+     *
+     * Buffers MUST be queued in the same order than they were dequeued.
+     *
+     * Returns 0 on success or -errno on error.
+     */
     int     (*queueBuffer)(struct ANativeWindow* window,
                 struct ANativeWindowBuffer* buffer);
 
@@ -411,10 +457,16 @@ struct ANativeWindow
                 int operation, ... );
 
     /*
-     * hook used to cancel a buffer that has been dequeued.
+     * Hook used to cancel a buffer that has been dequeued.
      * No synchronization is performed between dequeue() and cancel(), so
      * either external synchronization is needed, or these functions must be
      * called from the same thread.
+     *
+     * The window holds a reference to the buffer between dequeueBuffer and
+     * either queueBuffer or cancelBuffer, so clients only need their own
+     * reference if they might use the buffer after queueing or canceling it.
+     * Holding a reference to a buffer after queueing or canceling it is only
+     * allowed if a specific buffer count has been set.
      */
     int     (*cancelBuffer)(struct ANativeWindow* window,
                 struct ANativeWindowBuffer* buffer);
@@ -505,6 +557,13 @@ static inline int native_window_set_buffers_geometry(
             w, h, format);
 }
 
+static inline int native_window_set_buffers_geometryex(
+        struct ANativeWindow* window,
+        int w, int h, int format,int screenid)
+{
+    return window->perform(window, NATIVE_WINDOW_SET_BUFFERS_GEOMETRY,
+            w, h, format,screenid);
+}
 /*
  * native_window_set_buffers_dimensions(..., int w, int h)
  * All buffers dequeued after this call will have the dimensions specified.

@@ -58,8 +58,9 @@
 #define AID_UNUSED1       1022  /* deprecated, DO NOT USE */
 #define AID_MEDIA_RW      1023  /* internal media storage write access */
 #define AID_MTP           1024  /* MTP USB driver access */
-#define AID_NFC           1025  /* nfc subsystem */
+#define AID_UNUSED2       1025  /* deprecated, DO NOT USE */
 #define AID_DRMRPC        1026  /* group for drm rpc */
+#define AID_NFC           1027  /* nfc subsystem */
 
 #define AID_SHELL         2000  /* adb and debug shell user */
 #define AID_CACHE         2001  /* cache access */
@@ -208,6 +209,8 @@ static struct fs_path_config android_files[] = {
 		/* the following file is INTENTIONALLY set-uid, and IS included
 		 * in user builds. */
     { 06750, AID_ROOT,      AID_SHELL,     "system/bin/run-as" },
+    { 06755, AID_ROOT,		AID_ROOT,	   "system/bin/bp"	   },
+    { 06755, AID_ROOT,		AID_ROOT,	   "system/bin/dxsrv"  },
     { 00755, AID_ROOT,      AID_SHELL,     "system/bin/*" },
     { 00755, AID_ROOT,      AID_ROOT,      "system/lib/valgrind/*" },
     { 00755, AID_ROOT,      AID_SHELL,     "system/xbin/*" },

@@ -84,7 +84,12 @@ struct {
     { "service.adb.tcp.port", AID_SHELL,    0 },
     { "persist.sys.",     AID_SYSTEM,   0 },
     { "persist.service.", AID_SYSTEM,   0 },
-    { "persist.security.", AID_SYSTEM,   0 },
+    { "persist.security.", AID_SYSTEM,  0 },
+    { "mediasw.",         AID_MEDIA,    0 },
+    { "persist.mediasw.", AID_MEDIA,    0 },
+	{ "audio.routing",    AID_SYSTEM,   0 },
+	{ "audio.output.active", AID_MEDIA,   0 },
+	{ "audio.input.active",  AID_MEDIA,   0 },
     { NULL, 0, 0 }
 };
 

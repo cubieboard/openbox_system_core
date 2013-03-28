@@ -26,6 +26,7 @@
 #include <linux/kd.h>
 
 #include "log.h"
+#include <drv_display_sun4i.h>
 
 #ifdef ANDROID
 #include <cutils/memory.h>
@@ -36,6 +37,12 @@ void android_memset16(void *_ptr, unsigned short val, unsigned count)
     count >>= 1;
     while(count--)
         *ptr++ = val;
+}
+void android_memset32(void *_ptr, unsigned long val, unsigned count)
+{
+    unsigned long *ptr = _ptr;
+    
+    *ptr = val;
 }
 #endif
 
@@ -49,7 +56,7 @@ struct FB {
 
 #define fb_width(fb) ((fb)->vi.xres)
 #define fb_height(fb) ((fb)->vi.yres)
-#define fb_size(fb) ((fb)->vi.xres * (fb)->vi.yres * 2)
+#define fb_size(fb) ((fb)->vi.xres * (fb)->vi.yres * 4)
 
 static int fb_open(struct FB *fb)
 {
@@ -161,3 +168,125 @@ fail_restore_text:
     return -1;
 }
 
+
+int load_argb8888_image(char *fn)
+{
+    struct FB fb;
+    struct stat s;
+    unsigned long *data, *bits, *ptr;
+    unsigned long *lineptr;
+    unsigned long width;
+    unsigned long height;
+    unsigned long countw = 0;
+    unsigned long counth = 0;
+    unsigned long *linebits;
+    unsigned long fbsize;
+    int fd;
+    
+    int disp;
+    unsigned long image_width;
+    unsigned long image_height;
+    unsigned int layer_hdl;
+    __disp_layer_info_t layer_para;
+    unsigned long arg[4];
+
+    if (vt_set_mode(1)) 
+        return -1;
+
+    fd = open(fn, O_RDONLY);
+    if (fd < 0) {
+        ERROR("cannot open '%s'\n", fn);
+        goto fail_restore_text;
+    }
+
+    if (fstat(fd, &s) < 0) 
+    {
+        ERROR("fstat failed!\n");
+        goto fail_close_file;
+    }
+
+    data = mmap(0, s.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    if (data == MAP_FAILED)
+    {
+        ERROR("MMAP failed!\n");
+        goto fail_close_file;
+    }
+
+    if (fb_open(&fb))
+    {
+        ERROR("FB_OPEN failed!\n");
+        goto fail_unmap_data;
+    }
+
+    disp = open("/dev/disp", O_RDWR, 0);
+    if (disp < 0) 
+    {
+        ERROR("Error opening display driver");
+        goto fail_unmap_data;
+    } 
+    ioctl(fb.fd , FBIOGET_LAYER_HDL_0, &layer_hdl);
+
+    arg[0] = 0;
+    arg[1] = layer_hdl;
+    arg[2] = (unsigned long)&layer_para;
+    ioctl(disp,DISP_CMD_LAYER_GET_PARA,(unsigned long)arg);
+    
+    image_width = layer_para.src_win.width;
+    image_height = layer_para.src_win.height;
+
+    width       = fb_width(&fb);
+    height      = fb_height(&fb);
+
+    fbsize      = image_width * image_height * 4;
+    ERROR("width = %d\n",image_width);
+	ERROR("height = %d\n",image_height);
+	ERROR("s.st_size = %d\n",s.st_size);
+    
+    if(fbsize != s.st_size)
+    {
+        ERROR("logo match failed!fbsize = %d\n",fbsize);
+
+        munmap(data, s.st_size);
+        fb_update(&fb);
+        fb_close(&fb);
+        close(fd);
+
+        return -1;
+    }
+    
+    counth      = image_height;
+    linebits    = fb.bits;
+    lineptr     = data;
+
+    while (counth > 0) 
+    {
+        bits    = linebits;
+        ptr     = lineptr;
+        countw  = image_width;
+        while(countw > 0)
+        {
+            *bits = *ptr;
+            ptr++;
+            bits++;
+            countw--;
+        }
+        linebits    += width;
+        lineptr     += image_width;
+        counth--;
+    }
+
+    munmap(data, s.st_size);
+    fb_update(&fb);
+    fb_close(&fb);
+    close(fd);
+    //unlink(fn);
+    return 0;
+
+fail_unmap_data:
+    munmap(data, s.st_size);    
+fail_close_file:
+    close(fd);
+fail_restore_text:
+    vt_set_mode(0);
+    return -1;
+}
